@@ -1,0 +1,80 @@
+pipeline {
+    agent {
+        label 'AWS-EC2-Worker-Agent-1'
+    }
+
+    environment {
+        DOCKERHUB_CREDENTIALS = credentials('charans06')
+        IMAGE_NAME = 'charans06/Newpythonapp'
+        CONTAINER_NAME = 'python-jenkins-app'
+    }
+
+    stages {
+
+        stage('Checkout Code') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/CharanS-06/ProgramsPY.git'
+
+                dir('python-jenkins-app') {
+                    sh 'pwd'
+                    sh 'ls -la'
+                }
+            }
+        }
+
+        stage('Test') {
+            steps {
+                dir('python-jenkins-app') {
+                    sh 'python3 -m py_compile app.py'
+                    sh 'python3 -m pip --version'
+                }
+            }
+        }
+
+        stage('Build') {
+            steps {
+                dir('python-jenkins-app') {
+                    sh 'docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} .'
+                }
+            }
+        }
+
+        stage('Push') {
+            steps {
+                sh '''
+                    set +x
+                    echo "$DOCKERHUB_CREDENTIALS_PSW" | docker login -u "$DOCKERHUB_CREDENTIALS_USR" --password-stdin
+                    docker push "${IMAGE_NAME}:${BUILD_NUMBER}"
+                    docker logout
+                '''
+            }
+        }
+
+        stage('Run') {
+            steps {
+                sh 'docker rm -f "$CONTAINER_NAME" 2>/dev/null || true'
+                sh 'docker run -d --name "$CONTAINER_NAME" --restart unless-stopped -p 5000:5000 "${IMAGE_NAME}:${BUILD_NUMBER}"'
+            }
+        }
+
+        stage('Health Check') {
+            steps {
+                sh '''
+                    for i in $(seq 1 15); do
+                        if curl -fsS http://127.0.0.1:5000/health; then
+                            echo "Application is healthy"
+                            exit 0
+                        fi
+
+                        sleep 2
+                    done
+
+                    echo "Application health check failed"
+                    docker logs "$CONTAINER_NAME"
+                    exit 1
+                '''
+            }
+        }
+    }
+}
