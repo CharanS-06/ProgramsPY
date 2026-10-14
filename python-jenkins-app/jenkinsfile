@@ -13,9 +13,7 @@ pipeline {
 
         stage('Checkout Code') {
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/CharanS-06/ProgramsPY.git'
-
+                git branch: 'main', changelog: false, poll: false, url: 'https://github.com/CharanS-06/ProgramsPY.git'
                 dir('python-jenkins-app') {
                     sh 'pwd'
                     sh 'ls -la'
