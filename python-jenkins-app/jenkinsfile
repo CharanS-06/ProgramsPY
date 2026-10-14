@@ -5,7 +5,7 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('charans06')
-        IMAGE_NAME = 'charans06/Newpythonapp'
+        IMAGE_NAME = 'charans06/newpythonapp'
         CONTAINER_NAME = 'python-jenkins-app'
     }
 
