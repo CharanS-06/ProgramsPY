@@ -40,17 +40,30 @@ pipeline {
         stage('Build') {
             steps {
                 dir('python-jenkins-app') {
-                    sh 'docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} .'
+                    sh '''
+                        set -eu
+
+                        docker build \
+                            -t "${IMAGE_NAME}:${BUILD_NUMBER}" \
+                            -t "${IMAGE_NAME}:latest" \
+                            .
+                    '''
                 }
             }
-        }
+        }  
         stage('Push') {
             steps {
                 sh '''
+                    set -eu
                     set +x
-                    echo "$DOCKERHUB_CREDENTIALS_PSW" | docker login -u "$DOCKERHUB_CREDENTIALS_USR" --password-stdin
+
+                    trap 'docker logout >/dev/null 2>&1 || true' EXIT
+
+                    echo "$DOCKERHUB_CREDENTIALS_PSW" |
+                        docker login -u "$DOCKERHUB_CREDENTIALS_USR" --password-stdin
+
                     docker push "${IMAGE_NAME}:${BUILD_NUMBER}"
-                    docker logout
+                    docker push "${IMAGE_NAME}:latest"
                 '''
             }
         }
