@@ -4,6 +4,10 @@ pipeline {
         label 'AWS-EC2-Worker-Agent-1'
     }
 
+    options {
+        disableConcurrentBuilds()
+    }
+
     environment {
         DOCKERHUB_CREDENTIALS = credentials('charans06')
         IMAGE_NAME = 'charans06/newpythonapp'
