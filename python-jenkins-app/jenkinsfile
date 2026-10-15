@@ -167,14 +167,46 @@ pipeline {
                 sh '''
                     set -eu
 
-                    sudo -n /usr/local/sbin/switch-python-app-backend \
-                        "$TARGET_PORT"
+                    echo "Switching traffic to port ${TARGET_PORT}..."
 
-                    curl --retry 5 --retry-delay 1 \
-                        --retry-connrefused \
-                        -fsS http://127.0.0.1/health
+                    sudo -n /usr/local/sbin/switch-python-app-backend "$TARGET_PORT"
 
-                    echo "Traffic switched to port ${TARGET_PORT}"
+                    if curl --retry 5 \
+                            --retry-delay 1 \
+                            --retry-connrefused \
+                            -fsS http://127.0.0.1/health; then
+
+                        echo "Traffic switch successful."
+                        echo "Application is healthy through Nginx."
+
+                    else
+                        echo "ERROR: Health check failed after traffic switch."
+                        echo "Rolling back to port ${ACTIVE_PORT}..."
+
+                        if sudo -n /usr/local/sbin/switch-python-app-backend "$ACTIVE_PORT"; then
+
+                            if curl --retry 5 \
+                                    --retry-delay 1 \
+                                    --retry-connrefused \
+                                    -fsS http://127.0.0.1/health; then
+
+                                echo "Rollback successful."
+                                echo "Previous application is healthy."
+
+                            else
+                                echo "CRITICAL: Rollback completed, but health check failed."
+                                echo "Do not remove either application container."
+                                exit 1
+                            fi
+
+                        else
+                            echo "CRITICAL: Rollback command failed."
+                            echo "Do not remove either application container."
+                            exit 1
+                        fi
+
+                        exit 1
+                    fi
                 '''
             }
         }
@@ -182,14 +214,14 @@ pipeline {
 
     post {
         failure {
-            script {
+            /*script {
                 if (env.TARGET_CONTAINER?.trim()) {
                     sh '''
                         docker rm -f "$TARGET_CONTAINER" \
                             2>/dev/null || true
                     '''
                 }
-            }
+            }*/
 
             echo 'Deployment failed. The previous Nginx backend should remain active.'
         }
