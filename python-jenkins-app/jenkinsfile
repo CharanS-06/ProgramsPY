@@ -2,15 +2,12 @@ pipeline {
     agent {
         label 'AWS-EC2-Worker-Agent-1'
     }
-
     environment {
         DOCKERHUB_CREDENTIALS = credentials('charans06')
         IMAGE_NAME = 'charans06/newpythonapp'
         CONTAINER_NAME = 'python-jenkins-app'
     }
-
     stages {
-
         stage('Checkout Code') {
             steps {
                 git branch: 'main', changelog: false, poll: false, url: 'https://github.com/CharanS-06/ProgramsPY.git'
@@ -20,16 +17,26 @@ pipeline {
                 }
             }
         }
-
         stage('Test') {
             steps {
                 dir('python-jenkins-app') {
-                    sh 'python3 -m py_compile app.py'
-                    sh 'python3 -m pip --version'
+                    sh '''
+                        set -eu
+
+                        python3 -m py_compile app.py test_app.py
+
+                        VENV_DIR="$(mktemp -d)"
+                        trap 'rm -rf "$VENV_DIR"' EXIT
+
+                        python3 -m venv "$VENV_DIR"
+                        . "$VENV_DIR/bin/activate"
+
+                        python -m pip install -r requirements.txt
+                        python -m pytest -v test_app.py
+                    '''
                 }
             }
         }
-
         stage('Build') {
             steps {
                 dir('python-jenkins-app') {
@@ -37,7 +44,6 @@ pipeline {
                 }
             }
         }
-
         stage('Push') {
             steps {
                 sh '''
@@ -48,14 +54,12 @@ pipeline {
                 '''
             }
         }
-
         stage('Run') {
             steps {
                 sh 'docker rm -f "$CONTAINER_NAME" 2>/dev/null || true'
                 sh 'docker run -d --name "$CONTAINER_NAME" --restart unless-stopped -p 5000:5000 "${IMAGE_NAME}:${BUILD_NUMBER}"'
             }
         }
-
         stage('Health Check') {
             steps {
                 sh '''
